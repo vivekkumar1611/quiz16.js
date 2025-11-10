@@ -1,0 +1,12 @@
+{
+  "name": "quiz-backend",
+  "version": "1.0.0",
+  "main": "quiz.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node quiz.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
