@@ -9,6 +9,12 @@ pipeline {
         SCANNER_HOME = tool 'sonar-scanner'
         IMAGE_NAME = "quiz-app"
         IMAGE_TAG = "${BUILD_NUMBER}"
+
+        // Replace with your EC2 public IP
+        NEXUS_URL = "16.16.177.176:8082"
+
+        // Nexus Docker repository name
+        NEXUS_REPO = "docker-hosted"
     }
 
     stages {
@@ -35,47 +41,68 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonar-server') {
-                    sh '''
-                    $SCANNER_HOME/bin/sonar-scanner \
+                    sh """
+                    ${SCANNER_HOME}/bin/sonar-scanner \
                     -Dsonar.projectKey=quiz16 \
                     -Dsonar.projectName=quiz16 \
-                    -Dsonar.sources=.
-                    '''
+                    -Dsonar.sources=. \
+                    -Dsonar.login=$SONAR_AUTH_TOKEN
+                    """
                 }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t quiz-app:${BUILD_NUMBER} .'
+                sh """
+                docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                """
             }
         }
 
-        stage('Push Artifact to Nexus') {
+        stage('Tag Docker Image') {
             steps {
-                sh '''
-                docker tag quiz-app:${BUILD_NUMBER} \
-                PUBLIC-IP:8082/repository/docker-hosted/quiz-app:${BUILD_NUMBER}
+                sh """
+                docker tag ${IMAGE_NAME}:${IMAGE_TAG} \
+                ${NEXUS_URL}/${NEXUS_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
+                """
+            }
+        }
 
-                docker login PUBLIC-IP:8082 -u admin -p admin123
+        stage('Push Docker Image to Nexus') {
+            steps {
+                sh """
+                docker login ${NEXUS_URL} -u admin -p admin123
 
-                docker push PUBLIC-IP:8082/repository/docker-hosted/quiz-app:${BUILD_NUMBER}
-                '''
+                docker push \
+                ${NEXUS_URL}/${NEXUS_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
+                """
             }
         }
 
         stage('Deploy Application') {
             steps {
-                sh '''
-                docker stop quiz-app || true
-                docker rm quiz-app || true
+                sh """
+                docker stop ${IMAGE_NAME} || true
+                docker rm ${IMAGE_NAME} || true
 
                 docker run -d \
-                --name quiz-app \
+                --name ${IMAGE_NAME} \
                 -p 3000:3000 \
-                quiz-app:${BUILD_NUMBER}
-                '''
+                ${IMAGE_NAME}:${IMAGE_TAG}
+                """
             }
+        }
+    }
+
+    post {
+
+        success {
+            echo 'Pipeline executed successfully!'
+        }
+
+        failure {
+            echo 'Pipeline failed!'
         }
     }
 }
