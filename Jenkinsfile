@@ -7,14 +7,14 @@ pipeline {
 
     environment {
         SCANNER_HOME = tool 'sonar-scanner'
+
         IMAGE_NAME = "quiz-app"
-        IMAGE_TAG = "${BUILD_NUMBER}"
+        IMAGE_TAG  = "${BUILD_NUMBER}"
 
-        // Replace with your EC2 public IP
-        NEXUS_URL = "16.16.177.176:8082"
+        NEXUS_URL  = "16.16.177.176:8082"
+        REPO_NAME  = "docker-hosted"
 
-        // Nexus Docker repository name
-        NEXUS_REPO = "docker-hosted"
+        SONAR_TOKEN = credentials('sonar-token')
     }
 
     stages {
@@ -46,7 +46,7 @@ pipeline {
                     -Dsonar.projectKey=quiz16 \
                     -Dsonar.projectName=quiz16 \
                     -Dsonar.sources=. \
-                    -Dsonar.login=$SONAR_AUTH_TOKEN
+                    -Dsonar.login=${SONAR_TOKEN}
                     """
                 }
             }
@@ -64,7 +64,7 @@ pipeline {
             steps {
                 sh """
                 docker tag ${IMAGE_NAME}:${IMAGE_TAG} \
-                ${NEXUS_URL}/${NEXUS_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
+                ${NEXUS_URL}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}
                 """
             }
         }
@@ -72,10 +72,10 @@ pipeline {
         stage('Push Docker Image to Nexus') {
             steps {
                 sh """
-                docker login ${NEXUS_URL} -u admin -p admin123
+                echo "admin123" | docker login ${NEXUS_URL} -u admin --password-stdin
 
                 docker push \
-                ${NEXUS_URL}/${NEXUS_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
+                ${NEXUS_URL}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}
                 """
             }
         }
@@ -83,20 +83,22 @@ pipeline {
         stage('Deploy Application') {
             steps {
                 sh """
-                docker stop ${IMAGE_NAME} || true
-                docker rm ${IMAGE_NAME} || true
+                docker stop quiz-app || true
+                docker rm quiz-app || true
+
+                docker pull \
+                ${NEXUS_URL}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}
 
                 docker run -d \
-                --name ${IMAGE_NAME} \
+                --name quiz-app \
                 -p 3000:3000 \
-                ${IMAGE_NAME}:${IMAGE_TAG}
+                ${NEXUS_URL}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}
                 """
             }
         }
     }
 
     post {
-
         success {
             echo 'Pipeline executed successfully!'
         }
