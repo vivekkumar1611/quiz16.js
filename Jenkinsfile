@@ -21,7 +21,8 @@ pipeline {
 
         stage('Clone Repository') {
             steps {
-                git 'https://github.com/vivekkumar1611/quiz16.js.git'
+                git branch: 'main',
+                url: 'https://github.com/vivekkumar1611/quiz16.js.git'
             }
         }
 
@@ -38,8 +39,7 @@ pipeline {
                     $SCANNER_HOME/bin/sonar-scanner \
                     -Dsonar.projectKey=quiz16 \
                     -Dsonar.projectName=quiz16 \
-                    -Dsonar.sources=. \
-                    -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+                    -Dsonar.sources=.
                     '''
                 }
             }
