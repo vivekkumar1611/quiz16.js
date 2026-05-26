@@ -6,10 +6,11 @@ pipeline {
     }
 
     environment {
+
         SCANNER_HOME = tool 'sonar-scanner'
 
         IMAGE_NAME = "quiz-app"
-        IMAGE_TAG  = "${BUILD_NUMBER}"
+        IMAGE_TAG  = "latest"
 
         NEXUS_URL  = "16.16.177.176:8082"
         REPO_NAME  = "docker-hosted"
@@ -40,7 +41,9 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
+
                 withSonarQubeEnv('sonar-server') {
+
                     sh """
                     ${SCANNER_HOME}/bin/sonar-scanner \
                     -Dsonar.projectKey=quiz16 \
@@ -54,6 +57,7 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
+
                 sh """
                 docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
                 """
@@ -62,6 +66,7 @@ pipeline {
 
         stage('Tag Docker Image') {
             steps {
+
                 sh """
                 docker tag ${IMAGE_NAME}:${IMAGE_TAG} \
                 ${NEXUS_URL}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}
@@ -71,40 +76,44 @@ pipeline {
 
         stage('Push Docker Image to Nexus') {
             steps {
-                sh """
-                echo "admin123" | docker login ${NEXUS_URL} -u admin --password-stdin
 
-                docker push \
-                ${NEXUS_URL}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}
-                """
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexus-creds',
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+
+                    sh """
+                    echo "${NEXUS_PASS}" | docker login ${NEXUS_URL} \
+                    -u ${NEXUS_USER} --password-stdin
+
+                    docker push \
+                    ${NEXUS_URL}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}
+                    """
+                }
             }
         }
 
-        stage('Deploy Application') {
+        stage('Deploy Using Ansible') {
             steps {
+
                 sh """
-                docker stop quiz-app || true
-                docker rm quiz-app || true
+                cd /home/ubuntu/ansible-project
 
-                docker pull \
-                ${NEXUS_URL}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}
-
-                docker run -d \
-                --name quiz-app \
-                -p 3000:3000 \
-                ${NEXUS_URL}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}
+                ansible-playbook -i inventory deploy.yml
                 """
             }
         }
     }
 
     post {
+
         success {
-            echo 'Pipeline executed successfully!'
+            echo 'CI/CD Pipeline Executed Successfully!'
         }
 
         failure {
-            echo 'Pipeline failed!'
+            echo 'Pipeline Failed!'
         }
     }
 }

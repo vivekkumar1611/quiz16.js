@@ -1,6 +1,11 @@
 const express = require("express");
+const path = require("path");
+
 const app = express();
 app.use(express.json());
+
+// ✅ Serve frontend
+app.use(express.static("public"));
 
 let quiz = [
   {
@@ -37,19 +42,24 @@ let quiz = [
 
 let score = 0;
 
-// ✅ Get all questions (hide answers)
+// ✅ Get all questions (without answers)
 app.get("/quiz", (req, res) => {
   res.json(quiz.map(({ answer, ...rest }) => rest));
 });
 
-// ✅ Submit an answer
+// ✅ Submit answer
 app.post("/quiz/:id", (req, res) => {
   const id = parseInt(req.params.id);
-  const userAnswer = req.body.answer.toLowerCase().trim();
+  const userAnswer = req.body.answer?.toLowerCase().trim();
+
   const question = quiz.find((q) => q.id === id);
 
   if (!question) {
     return res.status(404).json({ message: "Question not found" });
+  }
+
+  if (!userAnswer) {
+    return res.status(400).json({ message: "Answer is required" });
   }
 
   if (question.answer === userAnswer) {
@@ -63,12 +73,18 @@ app.post("/quiz/:id", (req, res) => {
   }
 });
 
-// ✅ View final score
+// ✅ Get score
 app.get("/score", (req, res) => {
   res.json({ final_score: score, total: quiz.length });
 });
 
-// ✅ Start server
-app.listen(5000, "0.0.0.0", () => {
-  console.log("✅ Quiz backend running on port 5000");
+// ✅ Home route fix (important fallback)
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// ✅ Start server on 3000
+const PORT = 3000;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Quiz backend running on port ${PORT}`);
 });
