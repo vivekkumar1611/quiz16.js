@@ -98,7 +98,7 @@ pipeline {
             steps {
 
                 sh """
-                cd /home/ubuntu/ansible-project
+                cd /var/jenkins_home/ansible-project
 
                 ansible-playbook -i inventory deploy.yml
                 """
